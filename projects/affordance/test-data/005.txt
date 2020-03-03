@@ -1,3 +1,0 @@
-There is a flathead screwdriver here.
-# put valid actions below
-take screwdriver

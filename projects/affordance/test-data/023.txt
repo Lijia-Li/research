@@ -1,6 +1,0 @@
-The basket is lowered to the bottom of the shaft.
-# put valid actions below
-take basket
-carry basket
-look basket
-hold basket

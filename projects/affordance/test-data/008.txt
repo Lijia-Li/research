@@ -1,8 +1,0 @@
-You are walking down a path through a forest. An endless orchestra of whispering trees and chirping birds play around you. The sun had already dipped below the mountains and the night rolls over the sky.
-# put valid actions below
-climb tree
-hunt bird
-build camp
-leave forest
-watch bird
-burn forest
