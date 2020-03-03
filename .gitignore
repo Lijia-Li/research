@@ -1,3 +1,9 @@
 data/
 !projects/.gitignore
 results/
+
+# system packages 
+env/
+__pycache__/
+*.py[cod]
+.DS_Store
