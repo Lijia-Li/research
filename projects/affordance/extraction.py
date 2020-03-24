@@ -9,7 +9,8 @@ from dumpstats import DumpStats
 from utils import *
 
 # make sure research library code is available
-ROOT_DIRECTORY = dirname(dirname(dirname(realpath(__file__))))
+
+
 sys.path.insert(0, ROOT_DIRECTORY)
 
 VPO = namedtuple('VPO', ('verb', 'prep', 'object'))

@@ -10,7 +10,7 @@ import nltk
 from nltk.wsd import lesk
 from nltk.corpus import wordnet as wn
 from PyDictionary import PyDictionary
-from knowledge_base import KnowledgeFile, URI
+from research.knowledge_base import KnowledgeFile, Value
 
 # update and load models
 try:
@@ -30,7 +30,6 @@ DICTIONARY = PyDictionary()
 ROOT_DIRECTORY = dirname(dirname(dirname(realpath(__file__))))
 sys.path.insert(0, ROOT_DIRECTORY)
 
-from research.knowledge_base import KnowledgeFile, Value
 
 UMBEL_KB_PATH = join_path(ROOT_DIRECTORY, 'data/kbs/umbel-concepts-typology.rdfsqlite')
 UMBEL = KnowledgeFile(UMBEL_KB_PATH)

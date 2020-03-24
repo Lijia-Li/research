@@ -1,0 +1,7 @@
+
+# Corpus Class
+# 	1. Corpus Folder Path
+#	2. Cached txt Folder Path (tokenized)
+# 	3. Prob files path 
+# 	4. hook up SQL file
+class Corpus 
