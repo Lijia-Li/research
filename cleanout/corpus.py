@@ -11,9 +11,10 @@
 # FOLDER LAYOUT
 # dump 
 # |----corpus
-# |----stats
+# |----processed_corpus
 #		 |---- NP
 #		 |---- VP
+# |----stats
 # 		 |---- cashed_prob
 #		 |---- sql_prob
 
@@ -33,27 +34,43 @@ class Corpus:
 		self.corpus_dir = join_path(self.dump_dir, "corpus")
 		self.stats_dir = join_path(self.dump_dir, "stats")
 
-		self.NP_extract_dir = join_path(self.stats_dir, "NP")  # pylint: disable=invalid-name
-		self.VP_extract_dir = join_path(self.stats_dir, "VP")  # pylint: disable=invalid-name
+		self.NP_extract_dir = join_path(self.dump_dir, "processed_corpus/NP")  # pylint: disable=invalid-name
+		self.VP_extract_dir = join_path(self.dump_dir, "processed_corpus/VP")  # pylint: disable=invalid-name
 		
 		self.cashed_prob = join_path(self.stats_dir, "cashed_prob")
 		self.sql_prob = join_path(self.stats_dir, "sql_prob")
     
-	def get_files_from_corpus(self): 
-		return get_filelist_from_folder(self.dump_dir)
 
-	def cache_semantic_list(VP_list, file, type="NP"):
+	def get_files_from_corpus(self): 
+		return get_filelist_from_folder(self.corpus_dir)
+
+	def cache_semantic_list(self, s_list, file, type):
+		"""cache out the semantics to processed_corpus folder
+
+		Arguments:
+			s_list {list(list(semantic))} -- e.g. [[NOUN: school ADJ: high], 
+[NOUN: place ADJ: tight]]
+			file {str} -- path name of the origonal file
+			type {str} -- "NP" or "VP"
+		
+		Raises:
+			KeyError -- [when the type is maldefined]
+		"""
+		
+		# Get the appropriate path 
 		if type == "NP":
-			path = join_path(self.NP_extract_dir, file)
+			path = join_path(self.NP_extract_dir, file.split("/")[-1])
 		elif type == "VP": 
-			path = join_path(self.VP_extract_dir, file)
+			path = join_path(self.VP_extract_dir, file.split("/")[-1])
 		else: 
 			raise KeyError("Only accept NP or VP")
-		with open(path, encoding='utf-8'):
-			for VP in VP_list: 
-				f.write(VP + "\n")
-			# loop through the list 
-			# print the list to the file 
+
+		# Cache out the processed data
+		with open(path, "w+", encoding='utf-8') as f:
+			for s in s_list: 
+				for item in s:
+					f.write(item + " ") 
+				f.write("\n")
 		return
 
 
