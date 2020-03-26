@@ -4,9 +4,6 @@
 # 	3. Prob files path 
 # 	4. hook up SQL file
 
-# FUNCTIONS
-# 	1. Get files from corpus folder
-# 	2. 
 
 # FOLDER LAYOUT
 # dump 
@@ -15,8 +12,10 @@
 #		 |---- NP
 #		 |---- VP
 # |----stats
-# 		 |---- cashed_prob
-#		 |---- sql_prob
+# 		 |---- np_count.db
+# 		 |---- vp_count.db
+# 		 |---- cashed_prob/
+#		 |---- sql_prob/
 
 import sys
 from os import mkdir, listdir, path
@@ -26,7 +25,6 @@ import sqlite3
 
 from utils import *
 
-# sys.path.insert(0, ROOT_DIRECTORY)
 
 class Corpus:
 	"""a class to wrap around corpus, including corpus and their data"""
@@ -45,30 +43,41 @@ class Corpus:
 		self.cashed_prob = join_path(self.stats_dir, "cashed_prob")
 		self.sql_prob = join_path(self.stats_dir, "sql_prob")
     
-
-    # Can not Insert in to the c when using 
 	@property
 	def np_conn(self): 
+		"""noun phrase database connection
+		
+		Returns:
+			db connection -- the connection to noun phrase count database
+		"""
 		# if db already created
 		if path.exists(self.np_count_path): 
 			print("here")
 			conn = sqlite3.connect(self.np_count_path)
 			c = conn.cursor()
-			
+
 		# otherwise, construct the db
 		else: 
 			conn = sqlite3.connect(self.np_count_path)
 			c = conn.cursor()
 			# Create a table with the column names
 			c.execute("""CREATE TABLE NP(
+						NP_id INTEGTER PRIMARY KEY,
 						NOUN TEXT,
 						ADJ TEXT,
-						COOCCUR INTEGER 
+						COOCCUR INTEGER DEFAULT 1,
+						UNIQUE(NOUN, ADJ)
 						)""")
+			# c.execute("""CREATE UNIQUE INDEX idx_n_a ON NP(NOUN, ADJ)""")
 		return conn
 
 
 	def get_files_from_corpus(self): 
+		"""yield path + filename for reading processing
+		
+		Yields:
+			str -- "path/filename" 
+		"""
 		return get_filelist_from_folder(self.corpus_dir)
 
 
@@ -106,17 +115,19 @@ class Corpus:
 		conn = self.np_conn;
 		c = conn.cursor()
 
-		# sql = "UPDATE NP SET COOCCUR = COOCCUR + 1 WHERE NOUN = (?) AND WHERE ADJ = (?)"
+		# sql = """INSERT INTO NP(NOUN, ADJ) VALUES(?, ?)
+	   	# 		 ON CONFLICT(NOUN, ADJ) DO UPDATE SET COOCCUR=COOCCUR+1;"""
 
 		# get the np cursor
 		for np in NP_list: 
 			# TODO: update COOCURR
-			# c.execute(sql, (np[0], np[1]))
+			c.execute(sql, (np[0], np[1]))
 			c.execute("INSERT INTO NP VALUES (?, ?, ?)", (np[0], np[1], 1))
 			conn.commit()
 
 		c.execute("SELECT * FROM NP")
-		# print(c.fetchall())
+		print(c.fetchall())
+		return
 
 
 
