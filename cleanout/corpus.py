@@ -38,7 +38,7 @@ class Corpus:
 		self.VP_extract_dir = join_path(self.dump_dir, "processed_corpus/VP")  # pylint: disable=invalid-name
 		
 		self.np_count_path = join_path(self.stats_dir, "np_count.db")
-
+		self.vp_count_path = join_path(self.stats_dir, "vp_count.db")
 
 		self.cashed_prob = join_path(self.stats_dir, "cashed_prob")
 		self.sql_prob = join_path(self.stats_dir, "sql_prob")
@@ -52,7 +52,6 @@ class Corpus:
 		"""
 		# if db already created
 		if path.exists(self.np_count_path): 
-			print("here")
 			conn = sqlite3.connect(self.np_count_path)
 			c = conn.cursor()
 
@@ -62,13 +61,38 @@ class Corpus:
 			c = conn.cursor()
 			# Create a table with the column names
 			c.execute("""CREATE TABLE NP(
-						NP_id INTEGTER PRIMARY KEY,
-						NOUN TEXT,
-						ADJ TEXT,
-						COOCCUR INTEGER DEFAULT 1,
-						UNIQUE(NOUN, ADJ)
+						np_id INTEGER PRIMARY KEY AUTOINCREMENT,
+						noun TEXT,
+						adj TEXT,
+						cooccur INTEGER DEFAULT 1
 						)""")
-			# c.execute("""CREATE UNIQUE INDEX idx_n_a ON NP(NOUN, ADJ)""")
+		return conn
+
+	@property
+	def vp_conn(self): 
+		"""verb phrase database connection
+		
+		Returns:
+			db connection -- the connection to verb phrase count database
+		"""
+		# if db already created
+		if path.exists(self.vp_count_path): 
+			conn = sqlite3.connect(self.vp_count_path)
+			c = conn.cursor()
+
+		# otherwise, construct the db
+		else: 
+			conn = sqlite3.connect(self.vp_count_path)
+			c = conn.cursor()
+			# Create a table with the column names
+			c.execute("""CREATE TABLE VP(
+						vp_id INTEGER PRIMARY KEY AUTOINCREMENT,
+						verb TEXT,
+						prep TEXT,
+						subj TEXT, 
+						obj TEXT,
+						cooccur INTEGER DEFAULT 1
+						)""")
 		return conn
 
 
@@ -81,56 +105,146 @@ class Corpus:
 		return get_filelist_from_folder(self.corpus_dir)
 
 
-	def cache_semantic_list(self, s_list, file, type):
+	def cache_semantic_dict(self, semantics, file):
 		"""cache out the semantics to processed_corpus folder
 
 		Arguments:
-			s_list {list(list(semantic))} -- e.g. [[NOUN: school ADJ: high], [NOUN: place ADJ: tight]]
+			s_dict {dict(dict(semantic))} TODO
 			file {str} -- path name of the origonal file
 			type {str} -- "NP" or "VP"
 		
 		Raises:
 			KeyError -- [when the type is maldefined]
 		"""
-		
-		# Get the appropriate path 
-		if type == "NP":
-			path = join_path(self.NP_extract_dir, file.split("/")[-1])
-		elif type == "VP": 
-			path = join_path(self.VP_extract_dir, file.split("/")[-1])
-		else: 
-			raise KeyError("Only accept NP or VP")
+		# Prepare two file path
+		file_id = file.split("/")[-1]
+		vp_path = "{}/{}".format(self.VP_extract_dir, file_id)
+		np_path = "{}/{}".format(self.NP_extract_dir, file_id)
 
-		# Cache out the processed data
-		with open(path, "w+", encoding='utf-8') as f:
-			for s in s_list: 
-				for item in s:
-					f.write(item + " ") 
-				f.write("\n")
+		with open(vp_path, "w", encoding='utf-8') as f_v, \
+			 open(np_path, "w", encoding='utf-8') as f_n: 
+
+			# Identify if the semantic is VP or NP, and cache to according file
+			for semantic in semantics: 
+				if "NOUN" in semantic.keys():
+					f_n.write(str(semantic._src_dict) + "\n")
+				else: 
+					f_v.write(str(semantic._src_dict) + "\n")
 		return
 
 
-	def update_NP_count(self, NP_list):
+	def update_sql_count(self, semantics):
+		np_semantics = []
+		vp_semantics = []
+
+		for semantic in semantics: 
+			if "NOUN" in semantic.keys():
+				np_semantics.append(semantic)
+			else: 
+				vp_semantics.append(semantic)
+
+		self.update_np_count(np_semantics)
+		self.update_vp_count(vp_semantics)
+
+		return 
+
+
+	def update_np_count(self, semantics):
+		"""Update NP count SQL with NP_list
+		
+		Arguments:
+			semantics  {list(dict())} -- e.g. [{'NOUN': 'apple', 'ADJ': 'red'}]
+		"""
 		# conn = sqlite3.connect(self.np_count_path)
 		conn = self.np_conn;
 		c = conn.cursor()
 
-		# sql = """INSERT INTO NP(NOUN, ADJ) VALUES(?, ?)
-	   	# 		 ON CONFLICT(NOUN, ADJ) DO UPDATE SET COOCCUR=COOCCUR+1;"""
+		# update or insert semantic into the sqlite
+		for semantic in semantics:
+			# Check if the semantic already exist or not			
+			c.execute('''
+				        SELECT np_id FROM NP WHERE noun=? AND adj=?
+			    	''', (semantic['NOUN'], semantic['ADJ']))
+			temp = c.fetchall()
 
-		# get the np cursor
-		for np in NP_list: 
-			# TODO: update COOCURR
-			c.execute(sql, (np[0], np[1]))
-			c.execute("INSERT INTO NP VALUES (?, ?, ?)", (np[0], np[1], 1))
+			# If not exist, insert
+			if len(temp) == 0:
+				c.execute('''INSERT INTO NP (noun, adj) VALUES (?, ?)
+							''', (semantic['NOUN'], semantic['ADJ']))
+			# If already exist, update the cooccurance. 
+			else:
+				c.execute(''' UPDATE NP SET cooccur = cooccur + 1 WHERE noun=? AND adj=?
+							''', (semantic['NOUN'], semantic['ADJ']))
 			conn.commit()
 
-		c.execute("SELECT * FROM NP")
-		print(c.fetchall())
+		# c.execute("SELECT * FROM NP")
+		# print(c.fetchall())
+		
+		conn.close()
+
 		return
 
 
+	def update_vp_count(self, semantics):
+		"""Update VP sqlite count with semantics list
+		
+		Arguments:
+			semantics {list(dict())} -- e.g. [{'TOOL': 'knife', 'VERB': 'cut', 'OBJ': 'apple'}]
+		"""
 
+		# connect to the database 
+		conn = self.vp_conn;
+		c = conn.cursor()
+
+		# update or insert semantic into the sqlite
+		for semantic in semantics:
+			semantic = self.fill_empty_semantics(semantic)
+			# Check if the semantic already exist or not			
+			c.execute('''
+				        SELECT vp_id FROM VP 
+				        WHERE verb=? AND prep=? AND subj=? AND obj=?
+			    		''', (semantic['VERB'], semantic['PREP'], semantic['SUBJ'], semantic['OBJ']))
+			temp = c.fetchall()
+
+			# If not exist, insert
+			if len(temp) == 0:
+				c.execute('''
+							INSERT INTO VP (verb, prep, subj, obj) VALUES (?, ?, ?, ?)
+							''', (semantic['VERB'], semantic['PREP'], semantic['SUBJ'], semantic['OBJ']))
+			# If already exist, update the cooccurance. 
+			else:
+				c.execute(''' 
+							UPDATE VP SET cooccur = cooccur + 1 
+							WHERE verb=? AND prep=? AND subj=? AND obj=?
+							''', (semantic['VERB'], semantic['PREP'], semantic['SUBJ'], semantic['OBJ']))
+			conn.commit()
+
+		# c.execute("SELECT * FROM VP")
+		# print(c.fetchall())
+		
+		conn.close()
+
+		return
+
+
+	def fill_empty_semantics(self, semantics): 
+		"""fill the semantics dictionary with None for empty parameters, to prepare for insert into SQLite
+		
+		
+		Arguments:
+			semantics {list(dict())} -- e.g. [{'TOOL': 'knife', 'VERB': 'cut', 'OBJ': 'apple'}]
+		
+		Returns:
+			[type] -- [description]
+		"""
+		fields = ['VERB', 'PREP', 'SUBJ', 'OBJ']
+		semantics = semantics._src_dict
+		for field in fields: 
+			try: 
+				semantics[field]
+			except KeyError:
+				semantics[field] = ""
+		return semantics
 
 
 

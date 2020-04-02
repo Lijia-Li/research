@@ -161,8 +161,8 @@ def print_parse_tree(doc, prefix=''):
             print_token_tree(token)
             break
 
-
-def extract_semantics(doc):
+# TODO: pass RULES as a paramter, not global var
+def extract_semantics(doc, RULES):
     semantics = []
     for token in doc:
         for rules in (RULES.get(''), RULES.get(token.pos_, [])):
@@ -177,6 +177,7 @@ def extract_semantics(doc):
                     elif len(match) == max_length:
                         rule_semantics.append(match)
             semantics.extend(rule_semantics)
+    # TODO: remove set! because count matters! 
     return set(semantics)
 
 
