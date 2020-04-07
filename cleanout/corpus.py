@@ -203,20 +203,20 @@ class Corpus:
 			c.execute('''
 				        SELECT vp_id FROM VP 
 				        WHERE verb=? AND prep=? AND subj=? AND obj=?
-			    		''', (semantic['VERB'], semantic['PREP'], semantic['SUBJ'], semantic['OBJ']))
+			    		''', (semantic['VERB'], semantic['PREP'], semantic['SUB'], semantic['OBJ']))
 			temp = c.fetchall()
 
 			# If not exist, insert
 			if len(temp) == 0:
 				c.execute('''
 							INSERT INTO VP (verb, prep, subj, obj) VALUES (?, ?, ?, ?)
-							''', (semantic['VERB'], semantic['PREP'], semantic['SUBJ'], semantic['OBJ']))
+							''', (semantic['VERB'], semantic['PREP'], semantic['SUB'], semantic['OBJ']))
 			# If already exist, update the cooccurance. 
 			else:
 				c.execute(''' 
 							UPDATE VP SET cooccur = cooccur + 1 
 							WHERE verb=? AND prep=? AND subj=? AND obj=?
-							''', (semantic['VERB'], semantic['PREP'], semantic['SUBJ'], semantic['OBJ']))
+							''', (semantic['VERB'], semantic['PREP'], semantic['SUB'], semantic['OBJ']))
 			conn.commit()
 
 		# c.execute("SELECT * FROM VP")
@@ -237,7 +237,7 @@ class Corpus:
 		Returns:
 			[type] -- [description]
 		"""
-		fields = ['VERB', 'PREP', 'SUBJ', 'OBJ']
+		fields = ['VERB', 'PREP', 'SUB', 'OBJ']
 		semantics = semantics._src_dict
 		for field in fields: 
 			try: 
