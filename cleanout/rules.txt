@@ -1,0 +1,13 @@
+{
+    '': (
+        '((conj [VERB] (dobj [OBJ])))',
+    ),
+    'VERB': (
+        '([VERB] (prep [PREP] (pobj [OBJ])) (nsubj [SUB]))',
+        '([VERB] (nsubj [SUB]))',
+        '("use" (dobj [TOOL]) (xcomp [VERB] (dobj [OBJ])))',
+    ),
+    'NOUN': (
+        '([NOUN] (amod [ADJ]))',
+    ),
+}
