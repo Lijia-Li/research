@@ -59,6 +59,7 @@ def match_tree(token, rule):
     def _match_tree(token, rule, result):
         paren_count = 0
         index = 0
+        # make sure the rule is balanced with paranthesis
         for index, char in enumerate(rule):
             if char == '(':
                 paren_count += 1
@@ -68,10 +69,10 @@ def match_tree(token, rule):
                     break
         rule = rule[:index + 1]
         index = 1
+
         while index < len(rule):
             word = rule[index:rule.find(' ', index)]
             if word.startswith('-'):
-                # FIXME negations
                 pass
             elif word.startswith('"') and word.endswith('"'):
                 stem = word[1:-1]
@@ -110,25 +111,40 @@ def print_parse_tree(doc, prefix=''):
         if token.dep_ == 'ROOT':
             print_token_tree(token)
             break
+    return
 
-# TODO: pass RULES as a paramter, not global var
+
 def extract_semantics(doc, RULES):
+    """extract semantics by matching the tokens to the given rules
+    
+    Arguments:
+        doc {list} -- list of tokens
+        RULES {dict(tuple)} -- dictionary of rules, {root: (rule, rule)}
+                            -- example can be found in ./rules.txt
+    
+    Returns:
+        [type] -- [description]
+    """
     semantics = []
+
     for token in doc:
+        # for each set of rule that have different roots
         for rules in (RULES.get(''), RULES.get(token.pos_, [])):
             max_length = 0
             rule_semantics = []
+            # match every rule of the same root
             for rule in rules:
                 match = match_tree(token, rule)
+                # preserve match that are the same or longer than max match
                 if match:
                     if len(match) > max_length:
                         rule_semantics = [match]
                         max_length = len(match)
                     elif len(match) == max_length:
                         rule_semantics.append(match)
+            # add to the return list
             semantics.extend(rule_semantics)
-    # TODO: remove set! because count matters! 
-    return set(semantics)
+    return semantics
 
 
 def benchmark():
