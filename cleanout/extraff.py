@@ -16,56 +16,6 @@ except OSError:
 nltk.download('wordnet', quiet=True)
 
 
-def is_good_noun(token):
-    """Check if the token is an acceptable noun.
-
-    Parameters:
-        token (spacy.Token): The token to check.
-
-    Returns:
-        bool: Whether the token contains an acceptable noun.
-    """
-    return (
-        token.pos_ == 'NOUN'
-        and wn.morphy(token.text, wn.NOUN) 
-        and not has_number(token.text)
-    )
-
-
-def is_good_verb(token):
-    """Check if the token is an acceptable verb.
-
-    Parameters:
-        token (spacy.Token): The token to check.
-
-    Returns:
-        bool: Whether the token contains an acceptable verb.
-    """
-    exclude_verbs = ['have']
-    return (
-        token.pos_ == 'VERB' 
-        and wn.morphy(token.text, wn.VERB) 
-        and not token.is_stop 
-        and token.text not in exclude_verbs 
-        and not token.text.startswith("'")
-    )
-
-
-RULES = {
-    '': (
-        '((conj [VERB] (dobj [OBJ])))',
-    ),
-    'VERB': (
-        '([VERB] (prep [PREP] (pobj [OBJ])) (nsubj [SUB]))',
-        '([VERB] (nsubj [SUB]))',
-        '("use" (dobj [TOOL]) (xcomp [VERB] (dobj [OBJ])))',
-    ),
-    'NOUN': (
-        '([NOUN] (amod [ADJ]))',
-    ),
-}
-
-
 class FrozenDict:
 
     def __init__(self, src_dict):
