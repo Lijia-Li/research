@@ -5,6 +5,7 @@ from collections import namedtuple
 import spacy
 import nltk
 from nltk.corpus import wordnet as wn
+from utils import censor
 
 SPACY_MODEL = 'en_core_web_sm'
 try:
