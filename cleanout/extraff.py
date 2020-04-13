@@ -5,7 +5,6 @@ from collections import namedtuple
 import spacy
 import nltk
 from nltk.corpus import wordnet as wn
-from utils import censor
 
 SPACY_MODEL = 'en_core_web_sm'
 try:
@@ -81,7 +80,8 @@ def match_tree(token, rule):
                     return len(rule), None
                 index = index + len(word) + 1
             elif word.startswith('[') and word.endswith(']'):
-                result[word[1:-1]] = str(token)
+                # update the matched result dictionaty
+                result[word[1:-1]] = censor(token)
                 index = index + len(word) + 1
             elif word.startswith('('):
                 prev_index = index
