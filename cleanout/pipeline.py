@@ -1,23 +1,12 @@
 # Import packages 
-import spacy
 import nltk
-from nltk.corpus import wordnet as wn
-from collections import namedtuple 
 
 # Import modules
 from corpus import *
 import utils
-from extraff import extract_semantics
+from extraff import extract_semantics, extract_from_corpus
 
-# Loading the tokenizer from spacy 
-SPACY_MODEL = 'en_core_web_sm'
-try:
-    NLP = spacy.load(SPACY_MODEL)
-except OSError:
-    spacy.cli.download(SPACY_MODEL)
-    NLP = spacy.load(SPACY_MODEL)
-
-# get NLTK from wordnet 
+# update wordnet if needed
 nltk.download('wordnet', quiet=True)
 
 
@@ -42,34 +31,6 @@ def pipeline(corpus, rules):
 	# generate 
 	corpus.v_a_pair()
 	corpus.cal_prob_v_a()
-
-
-def extract_from_corpus(corpus, rules): 
-	"""extract semantics from corpus, cache semantics, put them in to SQL count file
-	
-	Arguments:
-		corpus {Corpus} -- instance of Corpus class
-		rules {dict{dict}} -- dictionary of rules
-	"""
-	# loop through each file in the directory
-
-	for file in corpus.get_files_from_corpus():
-		semantics = []
-		# loop through each sentence in the file
-		for sentence in get_sentence_from_file(file): 
-			# tokenize sentence
-			doc = NLP(sentence)
-			# extract semantics from the document with specified rules
-			semantics.extend(extract_semantics(doc, rules))
-		
-		# cache semantic dictionary, to avoid parsing again
-		corpus.cache_semantic_dict(semantics, file)
-
-		# save to SQL counts file
-		corpus.update_sql_count(semantics)
-		print("Finished processing file {}".format(file))
-		
-	return corpus
       
 
 def main():

@@ -1,20 +1,15 @@
-import re
-from ast import literal_eval
-from collections import namedtuple
-
+"""A file that contains functions aim to extracting semantics"""
 import spacy
-import nltk
 from nltk.corpus import wordnet as wn
+from utils import censor
 
+# Loading the tokenizer from spacy 
 SPACY_MODEL = 'en_core_web_sm'
 try:
     NLP = spacy.load(SPACY_MODEL)
 except OSError:
     spacy.cli.download(SPACY_MODEL)
     NLP = spacy.load(SPACY_MODEL)
-
-nltk.download('wordnet', quiet=True)
-
 
 class FrozenDict:
 
