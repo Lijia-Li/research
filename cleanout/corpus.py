@@ -39,6 +39,7 @@ class Corpus:
 		
 		self.np_count_path = join_path(self.stats_dir, "np_count.db")
 		self.vp_count_path = join_path(self.stats_dir, "vp_count.db")
+		self.p_v_a_path = join_path(self.stats_dir, "p_v_a.db")
 
 		self.cashed_prob = join_path(self.stats_dir, "cashed_prob")
 		self.sql_prob = join_path(self.stats_dir, "sql_prob")
@@ -95,6 +96,26 @@ class Corpus:
 						)""")
 		return conn
 
+	@property
+	def p_v_a_conn(self):
+		# if db already created
+		if path.exists(self.p_v_a_path): 
+			conn = sqlite3.connect(self.p_v_a_path)
+
+		# otherwise, construct the db
+		else: 
+			# create table
+			conn = sqlite3.connect(self.p_v_a_path)
+			c = conn.cursor()
+			# Create a table with the column names
+			c.execute("""CREATE TABLE PVA(
+						va_id INTEGER PRIMARY KEY AUTOINCREMENT,
+						verb TEXT,
+						adj TEXT,
+						prob INTEGER DEFAULT -1
+						)""")
+
+		return conn
 
 	def get_files_from_corpus(self): 
 		"""yield path + filename for reading processing
@@ -246,13 +267,153 @@ class Corpus:
 				semantics[field] = ""
 		return semantics
 
+	# Calculate P(verb|adj)
+	# Calculate P(verb|adj) | P(verb)
+	# Note only considering subj
+	def cal_prob_v_a(self): 
+		"""Calculate P(verb|adj) = P(verb|noun) * P(noun|adj)"""
+
+		# connecting databases
+		vdb = self.vp_conn.cursor()
+		ndb = self.np_conn.cursor()
+		conn = self.p_v_a_conn
+		pva_db = conn.cursor()
+
+		# obtain pairs from the database
+		pva_db.execute("SELECT verb, adj FROM PVA")
+		v_a_pair = pva_db.fetchall()
+
+		# for each pari, calculate P(verb|adj) = P(verb|noun) * P(noun|adj) (for all nouns) 
+		for verb, adj in v_a_pair:
+			# list of P(V|N1) * P(N1|adj), where each prob is for a N1 
+			prob_ls = [] 
+
+			# get adj base count
+			ndb.execute("SELECT adj, SUM(cooccur) FROM NP WHERE adj=?", (adj,))
+			a_count = ndb.fetchall()[0][1]
+			# print(a_count)
+
+			# obtain list of subj, which describe noun which afford verb
+			vdb.execute("SELECT subj FROM VP WHERE verb=?", (verb,))
+			subj_ls = [s[0] for s in vdb.fetchall()]
+
+			# loop through all the subj, where a subj is called N1 in the comment
+			for subj in subj_ls: 
+
+				# obtain adj cooccurance with N1
+				ndb.execute("SELECT adj, noun, SUM(cooccur) FROM NP WHERE adj=? AND noun=?", (adj, subj))
+				a_n_count = ndb.fetchall()[0][2]
+				
+				# if N1 and adj does not cooccur, move on to the next N1
+				if a_n_count is None: 
+					continue
+				# print(a_n_count)
+
+				# calculate P(N1|adj)
+				p_n_a = a_n_count / a_count
+				# print("A|N: P({}|{}) = {}".format(subj, adj, p_n_a))
+
+				# obtain N1 appeared times total
+				vdb.execute("SELECT subj, SUM(cooccur) FROM VP WHERE subj=?", (subj,))
+				n_count = vdb.fetchall()[0][1]
+				# print("{}(NOUN) occur {} times in the file".format(subj, n_count))
+
+				# obtain verb, N1 cooccurance
+				vdb.execute("SELECT verb, subj, SUM(cooccur) FROM VP WHERE verb=? AND subj=?", (verb, subj))
+				v_n_count = vdb.fetchall()[0][2]
+				# print("{}(VERB) and {}(NOUN) coocur {} times".format(verb, subj, v_n_count))
+
+				# calculate P(verb|N1)
+				p_v_n = v_n_count / n_count
+				# print("V|S: P({}|{}) = {}".format(verb, subj, p_v_n))
+
+				# append the P(V|N1) * P(N1|adj) to prob list
+				prob_ls.append(p_v_n * p_n_a)
+				# print("appending {} to prob list".format(p_v_n * p_n_a))
+
+			# get sum of probability over all N1s --> P(verb|adj)
+			print("P(verb|adj): P({}|{}) {}".format(verb, adj, sum(prob_ls)))
+			pva_db.execute("UPDATE PVA SET prob=? WHERE verb=? AND adj=?", (sum(prob_ls), verb, adj))
+			conn.commit()
+
+		conn.close()
+		return
+
+
+	def v_a_pair(self):
+		"""Obtain the verb adj pair to prepare calculating P(verb|adj)"""
+		vdb = self.vp_conn.cursor()
+		ndb = self.np_conn.cursor()
+		conn = self.p_v_a_conn
+		pva_db = conn.cursor()
+
+		# obtain unique verbs in the sqlite
+		vdb.execute("SELECT verb FROM VP")
+		# [('cut',), ('lay',)] --> ['cut', 'lay']
+		verb_ls = [v[0] for v in vdb.fetchall()] 
+		verb_ls = list(set(verb_ls))
+
+		# loop through all the
+		for verb in verb_ls:
+			# obtain list of subj
+			vdb.execute("SELECT subj FROM VP WHERE verb=?", (verb,))
+			subj_ls = [s[0] for s in vdb.fetchall()]
+			subj_ls = list(set(subj_ls))
+
+			for subj in subj_ls: 
+				# obtain all the adjectives that describe the subj
+				ndb.execute("SELECT adj FROM NP WHERE noun=?", (subj,))
+				adj_ls = [adj[0] for adj in ndb.fetchall()]
+				for adj in adj_ls:
+					# print(verb, adj)
+					pva_db.execute("INSERT INTO PVA(verb, adj) VALUES (?, ?)", (verb, adj))
+				conn.commit()
+		conn.close()
+
+		return 
+
+
+	def cal_prob_v_n(self, noun): 
+		# P(verb|N1) = P(verb|adj) * P(adj|N1)
+		p_v_n = {}
+		# {verb1: [0.234, 0.12313]; verb2: [0.1]}
+
+		pva_db = self.p_v_a_conn.cursor()
+		ndb = self.np_conn.cursor()
+
+		ndb.execute("SELECT noun, SUM(cooccur) FROM NP WHERE noun=?", (noun,))
+		n_count = ndb.fetchall()[0][1]
+
+		# obtain all the adj
+		ndb.execute("SELECT adj, noun FROM NP WHERE noun=?", (noun,))
+		adj_ls = [t[0] for t in ndb.fetchall()]
+
+		for adj in adj_ls:
+			# obtain adj cooccurance with noun
+			ndb.execute("SELECT adj, noun, SUM(cooccur) FROM NP WHERE adj=? AND noun=?", (adj, noun))
+			a_n_count = ndb.fetchall()[0][2]
+
+			# P(adj|N1)
+			p_a_n = a_n_count / n_count
+
+			# Fetch all the verbs
+			pva_db.execute("SELECT verb, adj, prob FROM PVA WHERE adj=?", (adj,))
+			verb_ls = pva_db.fetchall()
+
+			for verb, adj, p_v_a in verb_ls: 
+				if p_v_n[verb]: 
+					p_v_n[verb] = p_v_n[verb] + p_v_a * p_a_n
+				else: 
+					p_v_n[verb] = p_v_a * p_a_n
+
+		return p_v_n
 
 
 
 
 
 
-
+		
 
 
 
