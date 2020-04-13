@@ -130,7 +130,7 @@ class Corpus:
 		"""cache out the semantics to processed_corpus folder
 
 		Arguments:
-			s_dict {dict(dict(semantic))} TODO
+			s_dict {dict(dict(semantic))} ”
 			file {str} -- path name of the origonal file
 			type {str} -- "NP" or "VP"
 		
@@ -155,6 +155,7 @@ class Corpus:
 
 
 	def update_sql_count(self, semantics):
+		"""A wrapper function to call both update_np_count and update_vp_count"""
 		np_semantics = []
 		vp_semantics = []
 
