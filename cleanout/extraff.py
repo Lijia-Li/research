@@ -148,47 +148,32 @@ def extract_semantics(doc, RULES):
     return semantics
 
 
-def benchmark():
+def extract_from_corpus(corpus, rules): 
+    """extract semantics from corpus, cache semantics, put them in to SQL count file
+    
+    Arguments:
+        corpus {Corpus} -- instance of Corpus class
+        rules {dict{dict}} -- dictionary of rules
+    """
+    # loop through each file in the directory
 
-    def print_failed(doc, actual, expected):
-        print(f'Failed sentence "{sentence}":')
-        print(f'    expected:')
-        for binding in extractions:
-            print('        {'
-                + ', '.join(f'{key}: {value}' for key, value in binding.items())
-                + '}'
-            )
-        print(f'    actual:')
-        for binding in actual:
-            print('        {'
-                + ', '.join(f'{key}: {value}' for key, value in binding.items())
-                + '}'
-            )
-        print(f'    parse tree:')
-        print_parse_tree(doc, prefix='        ')
+    for file in corpus.get_files_from_corpus():
+        semantics = []
+        # loop through each sentence in the file
+        for sentence in get_sentence_from_file(file): 
+            # tokenize sentence
+            doc = NLP(sentence)
+            # extract semantics from the document with specified rules
+            semantics.extend(extract_semantics(doc, rules))
+        
+        # cache semantic dictionary, to avoid parsing again
+        corpus.cache_semantic_dict(semantics, file)
 
-    count = 0
-    incorrect = 0
-    with open('benchmark') as fd:
-        sentence = None
-        extractions = set()
-        for line in [*fd.read().splitlines(), '']:
-            if line.startswith(' '):
-                assert "'" not in line
-                extractions.add(FrozenDict(literal_eval(
-                    '{' + re.sub(r'(\w+)', r'"\1"', line) + '}'
-                )))
-            else:
-                if sentence is not None:
-                    doc = NLP(sentence)
-                    actual = extract_semantics(doc)
-                    if actual != extractions:
-                        print_failed(doc, actual, extractions)
-                        incorrect += 1
-                    count += 1
-                sentence = line.strip()
-                extractions = set()
-    print(f'Score: {count - incorrect} / {count}')
+        # save to SQL counts file
+        corpus.update_sql_count(semantics)
+        print("Finished processing file {}".format(file))
+        
+    return corpus
 
 
 if __name__ == '__main__':
