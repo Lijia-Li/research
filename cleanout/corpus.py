@@ -117,6 +117,7 @@ class Corpus:
 
 		return conn
 
+
 	def get_files_from_corpus(self): 
 		"""yield path + filename for reading processing
 		
@@ -280,61 +281,35 @@ class Corpus:
 		conn = self.p_v_a_conn
 		pva_db = conn.cursor()
 
+		# calculate the unique pair for v_a
+		self.v_a_pair()
+
 		# obtain pairs from the database
 		pva_db.execute("SELECT verb, adj FROM PVA")
+		# TODO: directly using the cursor
 		v_a_pair = pva_db.fetchall()
 
 		# for each pari, calculate P(verb|adj) = P(verb|noun) * P(noun|adj) (for all nouns) 
 		for verb, adj in v_a_pair:
 			# list of P(V|N1) * P(N1|adj), where each prob is for a N1 
-			prob_ls = [] 
+			prob = 0
 
-			# get adj base count
-			ndb.execute("SELECT adj, SUM(cooccur) FROM NP WHERE adj=?", (adj,))
-			a_count = ndb.fetchall()[0][1]
-			# print(a_count)
+			# get adj base count (total adj appearance)
+			ndb.execute("SELECT SUM(cooccur) FROM NP WHERE adj=?", (adj,))
+			a_count = ndb.fetchall()[0][0]
 
 			# obtain list of subj, which describe noun which afford verb
-			vdb.execute("SELECT subj FROM VP WHERE verb=?", (verb,))
-			subj_ls = [s[0] for s in vdb.fetchall()]
+			vdb.execute("SELECT DISTINCT subj FROM VP WHERE verb=?", (verb,))
+			subj_ls = set([s[0] for s in vdb.fetchall()])
 
 			# loop through all the subj, where a subj is called N1 in the comment
 			for subj in subj_ls: 
-
-				# obtain adj cooccurance with N1
-				ndb.execute("SELECT adj, noun, SUM(cooccur) FROM NP WHERE adj=? AND noun=?", (adj, subj))
-				a_n_count = ndb.fetchall()[0][2]
-				
-				# if N1 and adj does not cooccur, move on to the next N1
-				if a_n_count is None: 
-					continue
-				# print(a_n_count)
-
-				# calculate P(N1|adj)
-				p_n_a = a_n_count / a_count
-				# print("A|N: P({}|{}) = {}".format(subj, adj, p_n_a))
-
-				# obtain N1 appeared times total
-				vdb.execute("SELECT subj, SUM(cooccur) FROM VP WHERE subj=?", (subj,))
-				n_count = vdb.fetchall()[0][1]
-				# print("{}(NOUN) occur {} times in the file".format(subj, n_count))
-
-				# obtain verb, N1 cooccurance
-				vdb.execute("SELECT verb, subj, SUM(cooccur) FROM VP WHERE verb=? AND subj=?", (verb, subj))
-				v_n_count = vdb.fetchall()[0][2]
-				# print("{}(VERB) and {}(NOUN) coocur {} times".format(verb, subj, v_n_count))
-
-				# calculate P(verb|N1)
-				p_v_n = v_n_count / n_count
-				# print("V|S: P({}|{}) = {}".format(verb, subj, p_v_n))
-
-				# append the P(V|N1) * P(N1|adj) to prob list
-				prob_ls.append(p_v_n * p_n_a)
-				# print("appending {} to prob list".format(p_v_n * p_n_a))
-
+				# calculate P(verb|N1) * P(N1|adj)
+				prob += self.cal_prob_v_a_given_N1(subj, verb, adj, a_count)
+			
 			# get sum of probability over all N1s --> P(verb|adj)
-			print("P(verb|adj): P({}|{}) {}".format(verb, adj, sum(prob_ls)))
-			pva_db.execute("UPDATE PVA SET prob=? WHERE verb=? AND adj=?", (sum(prob_ls), verb, adj))
+			# print("P(verb|adj): P({}|{}) {}".format(verb, adj, sum(prob_ls)))
+			pva_db.execute("UPDATE PVA SET prob=? WHERE verb=? AND adj=?", (prob, verb, adj))
 			conn.commit()
 
 		conn.close()
@@ -408,6 +383,46 @@ class Corpus:
 					p_v_n[verb] = p_v_a * p_a_n
 
 		return p_v_n
+
+
+	def cal_prob_v_a_given_N1(self, subj, verb, adj, a_count): 
+
+		vdb_i = self.vp_conn.cursor()
+		ndb_i = self.np_conn.cursor()
+
+		# obtain adj cooccurance with N1
+		ndb_i.execute("SELECT adj, noun, SUM(cooccur) FROM NP WHERE adj=? AND noun=?", (adj, subj))
+		# TODO: Fetch the one only, not using fetch all.
+		a_n_count = ndb_i.fetchall()[0][2]
+
+		# if N1 and adj does not cooccur, move on to the next N1
+		# and return P(verb|N1) * P(N1|adj) = 0
+		if a_n_count is None: 
+			return 0
+
+		# calculate P(N1|adj)
+		p_n_a = a_n_count / a_count
+		# print("A|N: P({}|{}) = {}".format(subj, adj, p_n_a))
+
+		# obtain N1 appeared times total
+		vdb_i.execute("SELECT subj, SUM(cooccur) FROM VP WHERE subj=?", (subj,))
+		n_count = vdb_i.fetchall()[0][1]
+		# print("{}(NOUN) occur {} times in the file".format(subj, n_count))
+
+		# obtain verb, N1 cooccurance
+		vdb_i.execute("SELECT verb, subj, SUM(cooccur) FROM VP WHERE verb=? AND subj=?", (verb, subj))
+		v_n_count = vdb_i.fetchall()[0][2]
+		# print("{}(VERB) and {}(NOUN) coocur {} times".format(verb, subj, v_n_count))
+
+		# calculate P(verb|N1)
+		p_v_n = v_n_count / n_count
+		# print("V|S: P({}|{}) = {}".format(verb, subj, p_v_n))
+
+		# append the P(V|N1) * P(N1|adj) to prob list
+		prob = p_v_n * p_n_a
+		# print("appending {} to prob list".format(p_v_n * p_n_a))
+
+		return prob
 
 
 

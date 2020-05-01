@@ -26,23 +26,25 @@ def pipeline(corpus, rules):
 	"""
 	
 	# Extract corpus to counts SQLite
-	extract_from_corpus (corpus, rules)
+	# extract_from_corpus (corpus, rules)
 
-	# generate 
-	corpus.v_a_pair()
+	# calculate P(verb|adj)
 	corpus.cal_prob_v_a()
-      
+
 
 def main():
 	# Create test corpus 
 	test_corpus = Corpus("data/test_corpus")
 	small_corpus = Corpus("data/small_corpus")
+	# One document to test profile
+	# profile_corpus = Corpus("data/profile_test")
+	profile_corpus = Corpus("data/profile_test_cached_g")
 
 	# Read rules
 	rules = get_rules("./rules.txt")
 
 	# Run extraction & prob calculation
-	pipeline(test_corpus, rules)
+	pipeline(profile_corpus, rules)
 
 
 if __name__ == '__main__':

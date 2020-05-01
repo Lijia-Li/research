@@ -1,7 +1,7 @@
 """A file that contains functions aim to extracting semantics"""
 import spacy
 from nltk.corpus import wordnet as wn
-from utils import censor
+from utils import *
 
 # Loading the tokenizer from spacy 
 SPACY_MODEL = 'en_core_web_sm'
